@@ -1,0 +1,51 @@
+version: '3'
+
+tasks:
+  up:
+    desc: Start containers
+    cmds:
+      - docker compose up -d
+
+  down:
+    desc: Stop containers
+    cmds:
+      - docker compose down
+
+  restart:
+    desc: Restart containers
+    cmds:
+      - docker compose restart
+
+  setup-env:
+    desc: Setup Python environment
+    cmds:
+      - docker compose exec glue.dev sh -c 'echo "export PYTHONPATH=/home/glue_user/workspace/src:\${PYTHONPATH}" > ~/.pythonpath'
+      - docker compose exec glue.dev sh -c 'source ~/.pythonpath'
+
+  create-bucket:
+    desc: Create S3 bucket in LocalStack
+    cmds:
+      - docker compose exec glue.dev aws s3 mb s3://test-job-bucket --endpoint-url http://s3.dev:4566
+
+  run-job:
+    desc: Run Glue job
+    deps: [up, create-bucket]
+    cmds:
+      - docker compose exec glue.dev aws s3 cp /home/glue_user/workspace/data/test_data.csv s3://test-job-bucket/test_data.csv --endpoint-url http://s3.dev:4566
+      - docker compose exec glue.dev python3 src/glue_job.py --JOB_NAME test
+
+  test:
+    desc: Run tests
+    deps: [up, setup-env]
+    cmds:
+      - docker compose exec glue.dev sh -c 'source ~/.pythonpath && python3 -m pytest tests -v'
+
+  test-down:
+    desc: テスト環境を停止します
+    cmds:
+      - docker compose down -v
+
+  test-logs:
+    desc: テスト環境のログを表示します
+    cmds:
+      - docker compose logs -f 
